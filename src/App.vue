@@ -7,7 +7,20 @@
       :max="progressMax"
     ></progress>
     <div v-if="showToast" class="toast toast-top toast-end z-[999]">
-      <div class="alert alert-success">
+      <div role="alert" class="alert alert-success">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6 shrink-0 stroke-current"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
         <span>Updated successfully</span>
       </div>
     </div>
@@ -58,8 +71,8 @@
               </button>
             </div>
           </div>
-          <div v-if="!branches" class="text-center mt-20">
-            <span class="loading loading-spinner loading-lg text-accent"></span>
+          <div v-if="!branches" class="text-center">
+            <div class="skeleton h-80 w-full"></div>
           </div>
           <div v-else class="relative overflow-x-auto">
             <table class="table">
@@ -99,6 +112,7 @@
     <dialog ref="addBranchesModal" class="modal z-[99]">
       <div class="modal-backdrop bg-black/50"></div>
       <div class="modal-box">
+        <!-- button below serves only a purpose of redirecting focus from multiselect, to fix it opening by default on modal open -->
         <button
           class="btn-ghost absolute right-2 top-2 text-transparent opacity-0 pointer-events-none"
         ></button>
@@ -132,6 +146,113 @@
         </div>
       </div>
     </dialog>
+    <dialog ref="branchReservationsModal" class="modal z-[99]">
+      <div class="modal-backdrop bg-black/50"></div>
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">
+          Edit
+          <span class="text-accent">{{
+            selectedBranch?.name || 'branch'
+          }}</span>
+          reservation settings
+        </h3>
+        <p class="py-4">
+          Branch working hours are
+          <span class="badge badge-lg badge-info">{{
+            ` ${selectedBranch?.opening_from} - ${selectedBranch?.opening_to}`
+          }}</span>
+        </p>
+        <div class="space-y-2">
+          <label class="form-control w-full">
+            <div class="label">
+              <span class="label-text"
+                >Reservation Duration (minutes)<span class="text-error"
+                  >*</span
+                ></span
+              >
+            </div>
+            <input
+              type="text"
+              placeholder="minutes"
+              class="input input-bordered w-full"
+              required
+            />
+          </label>
+          <label class="form-control w-full">
+            <div class="label">
+              <span class="label-text">Tables</span>
+            </div>
+            <!-- TODO -->
+            <input type="text" class="input input-bordered w-full" required />
+          </label>
+          <!-- TODO -->
+          <div class="pt-4 space-y-4">
+            <div class="collapse collapse-plus bg-base-200">
+              <input type="checkbox" checked />
+              <div class="collapse-title text-xl font-medium">Saturday</div>
+              <div class="collapse-content space-y-4">
+                <input
+                  type="text"
+                  class="input input-bordered w-full"
+                  required
+                />
+                <div class="flex items-center justify-between">
+                  <div class="flex space-x-2 items-center">
+                    <button class="btn btn-primary btn-sm">
+                      Add Reservation
+                    </button>
+                    <span class="text-info text-sm">3 left</span>
+                  </div>
+                  <button
+                    class="btn btn-outline btn-secondary btn-xs"
+                    @click.prevent="applyOnAllDays"
+                  >
+                    Apply on all days
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              v-for="n in 6"
+              :key="n"
+              class="collapse collapse-plus bg-base-200"
+            >
+              <input ref="applyAllDaysCheckbox" type="checkbox" />
+              <div class="collapse-title text-xl font-medium">
+                {{ daysAfterSaturday[n - 1] }}
+              </div>
+              <div class="collapse-content space-y-4">
+                <input
+                  type="text"
+                  class="input input-bordered w-full"
+                  required
+                />
+                <div class="flex items-center justify-between">
+                  <div class="flex space-x-2 items-center">
+                    <button class="btn btn-primary btn-sm">
+                      Add Reservation
+                    </button>
+                    <span class="text-info text-sm">3 left</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-action">
+          <button
+            class="btn"
+            :disabled="isLoadingBulkUpdate"
+            @click="closeBranchReservationsModal"
+          >
+            Close
+          </button>
+          <button class="btn btn-primary" :disabled="isLoadingBulkUpdate">
+            Save
+          </button>
+        </div>
+      </div>
+    </dialog>
   </div>
 </template>
 
@@ -157,7 +278,21 @@ export default {
       progressMax: 0,
       progressValue: 0,
       showToast: false,
+      daysAfterSaturday: [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+      ],
     }
+  },
+
+  computed: {
+    selectedBranch() {
+      return this.$store.state.selectedBranch
+    },
   },
 
   mounted() {
@@ -253,7 +388,9 @@ export default {
     },
 
     selectBranch(branch) {
-      console.log(branch.id)
+      this.openBranchReservationsModal()
+      this.$store.commit('setSelectedBranch', branch)
+      console.log(this.$store.state.selectedBranch)
     },
 
     async addBranches() {
@@ -270,6 +407,26 @@ export default {
     },
     closeAddBranchesModal() {
       this.$refs.addBranchesModal.close()
+    },
+
+    openBranchReservationsModal() {
+      this.$refs.branchReservationsModal.show()
+    },
+    closeBranchReservationsModal() {
+      this.$refs.branchReservationsModal.close()
+      for (const ref of this.$refs.applyAllDaysCheckbox) {
+        ref.checked = false
+      }
+    },
+
+    tableCustomLabel({ name, phone }) {
+      return `${name} - (${phone})`
+    },
+
+    applyOnAllDays() {
+      for (const ref of this.$refs.applyAllDaysCheckbox) {
+        ref.checked = true
+      }
     },
   },
 }

@@ -8,6 +8,7 @@ const store = new Vuex.Store({
   state: {
     integrations: [],
     selectedIntegration: null,
+    selectedBranch: null,
   },
 
   mutations: {
@@ -17,6 +18,10 @@ const store = new Vuex.Store({
 
     setSelectedIntegration(state, integration) {
       state.selectedIntegration = integration
+    },
+
+    setSelectedBranch(state, branch) {
+      state.selectedBranch = branch
     },
   },
 })
