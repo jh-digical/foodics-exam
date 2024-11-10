@@ -8,7 +8,7 @@
     ></progress>
     <div v-if="showToast" class="toast toast-top toast-end z-[999]">
       <div class="alert alert-success">
-        <span>Branches updated successfully.</span>
+        <span>Updated successfully</span>
       </div>
     </div>
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 py-10">
@@ -23,7 +23,7 @@
             <div v-if="branches" class="card-actions justify-end">
               <button
                 class="btn btn-outline btn-primary btn-sm"
-                onclick="my_modal_1.show()"
+                @click="openAddBranchesModal"
                 :disabled="isLoadingBulkUpdate"
               >
                 Add Branches
@@ -96,7 +96,7 @@
         </div>
       </div>
     </div>
-    <dialog id="my_modal_1" class="modal z-[99]">
+    <dialog ref="addBranchesModal" class="modal z-[99]">
       <div class="modal-backdrop bg-black/50"></div>
       <div class="modal-box">
         <button
@@ -258,10 +258,18 @@ export default {
 
     async addBranches() {
       console.log(this.selectedNoReservations)
+      this.closeAddBranchesModal()
       const branchIds = this.selectedNoReservations.map((branch) => branch.id)
       console.log(branchIds)
       await this.updateAllReservations(branchIds)
       this.selectedNoReservations = []
+    },
+
+    openAddBranchesModal() {
+      this.$refs.addBranchesModal.show()
+    },
+    closeAddBranchesModal() {
+      this.$refs.addBranchesModal.close()
     },
   },
 }
