@@ -178,13 +178,21 @@
               required
             />
           </label>
-          <label class="form-control w-full">
+          <div class="form-control w-full">
             <div class="label">
               <span class="label-text">Tables</span>
             </div>
-            <!-- TODO -->
-            <input type="text" class="input input-bordered w-full" required />
-          </label>
+            <multiselect
+              v-model="currentSelectedTables"
+              :options="selectedBranchTables"
+              :multiple="true"
+              label="name"
+              track-by="id"
+              :custom-label="tableCustomLabel"
+              :prevent-autofocus="true"
+              :disabled="isLoadingBulkUpdate"
+            ></multiselect>
+          </div>
           <!-- TODO -->
           <div class="pt-4 space-y-4">
             <div class="collapse collapse-plus bg-base-200">
@@ -286,6 +294,8 @@ export default {
         'Thursday',
         'Friday',
       ],
+      selectedBranchTables: [],
+      currentSelectedTables: [],
     }
   },
 
@@ -391,6 +401,11 @@ export default {
       this.openBranchReservationsModal()
       this.$store.commit('setSelectedBranch', branch)
       console.log(this.$store.state.selectedBranch)
+      if (this.selectedBranch) {
+        this.selectedBranchTables = this.createTableCollection(
+          this.selectedBranch.sections
+        )
+      }
     },
 
     async addBranches() {
@@ -414,19 +429,31 @@ export default {
     },
     closeBranchReservationsModal() {
       this.$refs.branchReservationsModal.close()
+      this.selectedBranchTables = []
+      this.currentSelectedTables = []
       for (const ref of this.$refs.applyAllDaysCheckbox) {
         ref.checked = false
       }
     },
 
-    tableCustomLabel({ name, phone }) {
-      return `${name} - (${phone})`
+    tableCustomLabel({ name, section }) {
+      return `${section} - (${name})`
     },
 
     applyOnAllDays() {
       for (const ref of this.$refs.applyAllDaysCheckbox) {
         ref.checked = true
       }
+    },
+
+    createTableCollection(sections) {
+      return sections.flatMap((section) =>
+        section.tables.map((table) => ({
+          id: table.id,
+          name: table.name,
+          section: section.name,
+        }))
+      )
     },
   },
 }
