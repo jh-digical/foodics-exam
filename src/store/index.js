@@ -6,20 +6,10 @@ Vue.use(Vuex)
 
 const store = new Vuex.Store({
   state: {
-    integrations: [],
-    selectedIntegration: null,
     selectedBranch: null,
   },
 
   mutations: {
-    setIntegrations(state, integrations) {
-      state.integrations = integrations
-    },
-
-    setSelectedIntegration(state, integration) {
-      state.selectedIntegration = integration
-    },
-
     setSelectedBranch(state, branch) {
       state.selectedBranch = branch
     },
