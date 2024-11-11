@@ -399,9 +399,7 @@ export default {
           false
         )
         this.branches = [...dataWithReservations, ...dataNoReservations]
-        console.log(this.branches)
         this.branchIdCollection = this.collectBranchIds(this.branches)
-        console.log(this.branchIdCollection)
         this.noReservations = dataNoReservations
         this.withReservations = dataWithReservations
         this.withReservationIds = this.collectBranchIds(dataWithReservations)
@@ -431,7 +429,6 @@ export default {
               `Failed to update branch ${branchId}: ${response.statusText}`
             )
           } else {
-            console.log(`Branch ${branchId} updated successfully.`)
             this.progressValue++
           }
         } catch (error) {
@@ -479,7 +476,6 @@ export default {
 
     selectBranch(branch) {
       this.$store.commit('setSelectedBranch', branch)
-      console.log(this.$store.state.selectedBranch)
       if (this.selectedBranch) {
         this.selectedBranchReservationDuration =
           this.selectedBranch.reservation_duration
@@ -502,10 +498,8 @@ export default {
     },
 
     async addBranches() {
-      console.log(this.selectedNoReservations)
       this.closeAddBranchesModal()
       const branchIds = this.selectedNoReservations.map((branch) => branch.id)
-      console.log(branchIds)
       await this.updateAllReservations(branchIds)
       this.selectedNoReservations = []
     },
@@ -569,7 +563,6 @@ export default {
         newTime,
       ])
       this.dayReservationTimes[day] = ''
-      console.log(this.selectedBranchReservationTimes)
     },
 
     editReservationTime(day, index) {
@@ -578,12 +571,9 @@ export default {
       this.dayReservationTimes[`isEdit${day}${index}`] = true
       this.dayReservationTimes[day] =
         this.selectedBranchReservationTimes[day][index].join('-')
-      console.log(this.dayReservationTimes)
-      console.log(this.selectedBranchReservationTimes[day][index])
     },
 
     saveNewReservation(day, index) {
-      console.log(this.dayReservationTimes[day])
       this.selectedBranchReservationTimes[day][index] =
         this.dayReservationTimes[day].split('-')
       this.dayReservationTimes = {}
