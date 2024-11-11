@@ -172,6 +172,7 @@
               >
             </div>
             <input
+              v-model="selectedBranchReservationDuration"
               type="text"
               placeholder="minutes"
               class="input input-bordered w-full"
@@ -193,55 +194,110 @@
               :disabled="isLoadingBulkUpdate"
             ></multiselect>
           </div>
-          <!-- TODO -->
           <div class="pt-4 space-y-4">
-            <div class="collapse collapse-plus bg-base-200">
-              <input type="checkbox" checked />
-              <div class="collapse-title text-xl font-medium">Saturday</div>
-              <div class="collapse-content space-y-4">
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  required
-                />
-                <div class="flex items-center justify-between">
-                  <div class="flex space-x-2 items-center">
-                    <button class="btn btn-primary btn-sm">
-                      Add Reservation
-                    </button>
-                    <span class="text-info text-sm">3 left</span>
-                  </div>
-                  <button
-                    class="btn btn-outline btn-secondary btn-xs"
-                    @click.prevent="applyOnAllDays"
-                  >
-                    Apply on all days
-                  </button>
-                </div>
-              </div>
-            </div>
             <div
-              v-for="n in 6"
+              v-for="n in 7"
               :key="n"
               class="collapse collapse-plus bg-base-200"
             >
               <input ref="applyAllDaysCheckbox" type="checkbox" />
-              <div class="collapse-title text-xl font-medium">
-                {{ daysAfterSaturday[n - 1] }}
+              <div class="collapse-title text-xl font-medium capitalize">
+                {{ daysList[n - 1] }}
               </div>
               <div class="collapse-content space-y-4">
+                <div class="flex flex-wrap gap-4 items-center">
+                  <div
+                    v-for="(time, index) in selectedBranchReservationTimes[
+                      daysList[n - 1]
+                    ]"
+                    :key="index"
+                    class="indicator"
+                  >
+                    <div class="indicator-item">
+                      <button
+                        v-show="
+                          !dayReservationTimes[
+                            `isEdit${daysList[n - 1]}${index}`
+                          ]
+                        "
+                        class="btn btn-error btn-xs rounded-full"
+                        @click="deleteReservation(daysList[n - 1], index)"
+                      >
+                        ✕
+                      </button>
+                      <button
+                        v-show="
+                          dayReservationTimes[
+                            `isEdit${daysList[n - 1]}${index}`
+                          ]
+                        "
+                        class="btn btn-warning btn-xs rounded-full"
+                        @click="saveNewReservation(daysList[n - 1], index)"
+                      >
+                        Save?
+                      </button>
+                    </div>
+                    <div class="indicator-item indicator-middle">
+                      <button
+                        v-show="
+                          dayReservationTimes[
+                            `isEdit${daysList[n - 1]}${index}`
+                          ]
+                        "
+                        class="btn btn-error btn-xs rounded-full"
+                        @click="cancelEditReservation"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <button
+                      class="btn btn-success"
+                      @click="editReservationTime(daysList[n - 1], index)"
+                    >
+                      {{ time.join('-') }}
+                    </button>
+                  </div>
+                </div>
                 <input
+                  v-model="dayReservationTimes[daysList[n - 1]]"
+                  v-mask="'##:##-##:##'"
                   type="text"
                   class="input input-bordered w-full"
-                  required
+                  placeholder="hh:mm - hh:mm"
+                  @input="handleReservationInputChange"
                 />
                 <div class="flex items-center justify-between">
                   <div class="flex space-x-2 items-center">
-                    <button class="btn btn-primary btn-sm">
+                    <button
+                      class="btn btn-primary btn-sm"
+                      @click="addDayReservation(daysList[n - 1])"
+                      :disabled="
+                        selectedBranchReservationTimes[daysList[n - 1]]
+                          ?.length === 3 || isEditingTime
+                      "
+                    >
                       Add Reservation
                     </button>
-                    <span class="text-info text-sm">3 left</span>
+                    <span class="text-info text-sm"
+                      >{{
+                        3 -
+                        (selectedBranchReservationTimes[daysList[n - 1]]
+                          ?.length || 0)
+                      }}
+                      left</span
+                    >
                   </div>
+                  <button
+                    v-if="n === 1"
+                    class="btn btn-outline btn-secondary btn-xs ml-auto"
+                    @click.prevent="applyOnAllDays"
+                    :disabled="
+                      isEditingTime ||
+                      !selectedBranchReservationTimes['saturday']?.length
+                    "
+                  >
+                    Apply on all days
+                  </button>
                 </div>
               </div>
             </div>
@@ -255,8 +311,13 @@
           >
             Close
           </button>
-          <button class="btn btn-primary" :disabled="isLoadingBulkUpdate">
-            Save
+          <button
+            class="btn btn-primary"
+            @click="saveBranchReservations"
+            :disabled="selectedBranchReservationDuration < 30 || isSavingBranch"
+          >
+            <span v-if="isSavingBranch" class="loading loading-spinner"></span>
+            {{ isSavingBranch ? 'Saving...' : 'Save' }}
           </button>
         </div>
       </div>
@@ -268,6 +329,7 @@
 import DataService from '@/services/dataService'
 import ThemeToggle from './components/ThemeToggle.vue'
 import Multiselect from 'vue-multiselect'
+import { cloneDeep } from 'lodash'
 
 export default {
   components: {
@@ -286,16 +348,31 @@ export default {
       progressMax: 0,
       progressValue: 0,
       showToast: false,
-      daysAfterSaturday: [
-        'Sunday',
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
+      daysList: [
+        'saturday',
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
       ],
       selectedBranchTables: [],
       currentSelectedTables: [],
+      selectedBranchReservationTimes: {
+        saturday: [],
+        sunday: [],
+        monday: [],
+        tuesday: [],
+        wednesday: [],
+        thursday: [],
+        friday: [],
+      },
+      clonedSelectedBranchReservationTimes: {},
+      dayReservationTimes: {},
+      isEditingTime: false,
+      selectedBranchReservationDuration: '',
+      isSavingBranch: false,
     }
   },
 
@@ -328,6 +405,9 @@ export default {
         this.noReservations = dataNoReservations
         this.withReservations = dataWithReservations
         this.withReservationIds = this.collectBranchIds(dataWithReservations)
+        this.clonedSelectedBranchReservationTimes = cloneDeep(
+          this.selectedBranchReservationTimes
+        )
       } catch (error) {
         console.error(
           'Unable to fetch data at this time. Please try again.',
@@ -398,14 +478,27 @@ export default {
     },
 
     selectBranch(branch) {
-      this.openBranchReservationsModal()
       this.$store.commit('setSelectedBranch', branch)
       console.log(this.$store.state.selectedBranch)
       if (this.selectedBranch) {
+        this.selectedBranchReservationDuration =
+          this.selectedBranch.reservation_duration
         this.selectedBranchTables = this.createTableCollection(
           this.selectedBranch.sections
         )
+        // cloneDeep fixes the reactivity issue on the visual data update of reservation times per day
+        if (this.selectedBranch.reservation_times) {
+          this.selectedBranchReservationTimes = cloneDeep(
+            this.selectedBranch.reservation_times
+          )
+        } else {
+          this.selectedBranchReservationTimes = cloneDeep(
+            this.clonedSelectedBranchReservationTimes
+          )
+        }
       }
+      this.dayReservationTimes = {}
+      this.openBranchReservationsModal()
     },
 
     async addBranches() {
@@ -426,11 +519,15 @@ export default {
 
     openBranchReservationsModal() {
       this.$refs.branchReservationsModal.show()
+      this.$refs.applyAllDaysCheckbox[0].checked = true
     },
     closeBranchReservationsModal() {
       this.$refs.branchReservationsModal.close()
       this.selectedBranchTables = []
       this.currentSelectedTables = []
+      this.dayReservationTimes = {}
+      this.isEditingTime = false
+      this.selectedBranchReservationTimes = {}
       for (const ref of this.$refs.applyAllDaysCheckbox) {
         ref.checked = false
       }
@@ -441,6 +538,14 @@ export default {
     },
 
     applyOnAllDays() {
+      for (const day of this.daysList) {
+        // Skip Saturday
+        if (day === 'saturday') continue
+
+        this.$set(this.selectedBranchReservationTimes, day, [
+          ...(this.selectedBranchReservationTimes?.['saturday'] ?? []),
+        ])
+      }
       for (const ref of this.$refs.applyAllDaysCheckbox) {
         ref.checked = true
       }
@@ -454,6 +559,78 @@ export default {
           section: section.name,
         }))
       )
+    },
+
+    addDayReservation(day) {
+      if (!this.dayReservationTimes[day]) return
+      const newTime = this.dayReservationTimes[day].split('-')
+      this.$set(this.selectedBranchReservationTimes, day, [
+        ...this.selectedBranchReservationTimes[day],
+        newTime,
+      ])
+      this.dayReservationTimes[day] = ''
+      console.log(this.selectedBranchReservationTimes)
+    },
+
+    editReservationTime(day, index) {
+      this.isEditingTime = true
+      this.dayReservationTimes = {}
+      this.dayReservationTimes[`isEdit${day}${index}`] = true
+      this.dayReservationTimes[day] =
+        this.selectedBranchReservationTimes[day][index].join('-')
+      console.log(this.dayReservationTimes)
+      console.log(this.selectedBranchReservationTimes[day][index])
+    },
+
+    saveNewReservation(day, index) {
+      console.log(this.dayReservationTimes[day])
+      this.selectedBranchReservationTimes[day][index] =
+        this.dayReservationTimes[day].split('-')
+      this.dayReservationTimes = {}
+      this.isEditingTime = false
+    },
+
+    cancelEditReservation() {
+      this.dayReservationTimes = {}
+      this.isEditingTime = false
+    },
+
+    deleteReservation(day, index) {
+      this.selectedBranchReservationTimes[day].splice(index, 1)
+      this.cancelEditReservation()
+    },
+
+    handleReservationInputChange(event) {
+      if (!event.target.value) {
+        this.dayReservationTimes = {}
+        this.isEditingTime = false
+      }
+    },
+
+    async saveBranchReservations() {
+      if (this.selectedBranchReservationDuration < 30) return
+      this.isSavingBranch = true
+      try {
+        const payload = {
+          reservation_duration: this.selectedBranchReservationDuration,
+          reservation_times: this.selectedBranchReservationTimes,
+        }
+        const response = await DataService.saveBranchReservations(
+          this.selectedBranch.id,
+          payload
+        )
+        if (response) {
+          this.showToast = true
+          setTimeout(() => {
+            this.showToast = false
+          }, 3000)
+        }
+        await this.fetchBranches()
+      } catch (error) {
+        console.error(error)
+      }
+      this.closeBranchReservationsModal()
+      this.isSavingBranch = false
     },
   },
 }

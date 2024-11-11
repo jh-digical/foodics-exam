@@ -28,4 +28,8 @@ export default {
       accepts_reservations: val,
     })
   },
+
+  saveBranchReservations(branchID, payload) {
+    return api.apiClient.put(`/branches/${branchID}`, payload)
+  },
 }
